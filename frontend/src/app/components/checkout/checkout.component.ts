@@ -7,6 +7,7 @@ import {
 } from '@angular/forms';
 import { Country } from 'src/app/common/country';
 import { State } from 'src/app/common/state';
+import { CartService } from 'src/app/services/cart.service';
 import { Luv2shopFormService } from 'src/app/services/luv2shop-form.service';
 import { CheckoutValidators } from 'src/app/validators/check-out-validators';
 
@@ -30,10 +31,13 @@ export class CheckoutComponent implements OnInit {
 
   constructor(
     private formBuilder: FormBuilder,
-    private luv2shopFormService: Luv2shopFormService
+    private luv2shopFormService: Luv2shopFormService,
+    private cartService: CartService
   ) {}
 
   ngOnInit(): void {
+    this.reviewCardDetails();
+
     this.checkoutFormGroup = this.formBuilder.group({
       customer: this.formBuilder.group({
         firstName: new FormControl('', [
@@ -131,6 +135,15 @@ export class CheckoutComponent implements OnInit {
       console.log(`Retrieved countries: ${JSON.stringify(data)}`);
       this.countries = data;
     });
+  }
+  reviewCardDetails() {
+    // subscribe to cartService.totalQuantity
+    this.cartService.totalQuantity.subscribe(
+      (data) => (this.totalQuantity = data)
+    );
+
+    // subscribe to cartService.totalPrice
+    this.cartService.totalPrice.subscribe((data) => (this.totalPrice = data));
   }
 
   get firstName() {
