@@ -26,6 +26,7 @@ import {
   OktaAuthGuard,
 } from '@okta/okta-angular';
 import { MembersPageComponent } from './components/members-page/members-page.component';
+import { OrderHistoryComponent } from './components/order-history/order-history.component';
 
 const oktaConfig = Object.assign(
   {
@@ -43,6 +44,12 @@ const routes: Routes = [
   {
     path: 'members',
     component: MembersPageComponent,
+    canActivate: [OktaAuthGuard],
+  },
+
+  {
+    path: 'order-history',
+    component: OrderHistoryComponent,
     canActivate: [OktaAuthGuard],
   },
 
@@ -73,6 +80,7 @@ const routes: Routes = [
     LoginComponent,
     LoginStatusComponent,
     MembersPageComponent,
+    OrderHistoryComponent,
   ],
   imports: [
     RouterModule.forRoot(routes),
