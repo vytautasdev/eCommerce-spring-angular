@@ -41,6 +41,16 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // populate customer with order
         var customer = purchase.getCustomer();
+
+        // check if this is an existing customer(based on customer email)
+        var email = customer.getEmail();
+        var customerFromDB = customerRepository.findByEmail(email);
+
+        if (customerFromDB != null) {
+            customer = customerFromDB;
+        }
+
+
         customer.add(order);
 
         // save to the database
