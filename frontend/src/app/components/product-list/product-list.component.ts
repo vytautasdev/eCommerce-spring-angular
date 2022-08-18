@@ -56,8 +56,6 @@ export class ProductListComponent implements OnInit {
 
     this.previousSearchInput = searchInput;
 
-    console.log(`searchInput=${searchInput}, pageNumber=${this.pageNumber}`);
-
     // now search for the products using searchInput
     this.productService
       .searchProductsPaginate(this.pageNumber - 1, this.pageSize, searchInput)
@@ -90,10 +88,6 @@ export class ProductListComponent implements OnInit {
 
     this.previousCategoryId = this.currentCategoryId;
 
-    console.log(
-      `currCategoryId=${this.currentCategoryId}, pageNumber=${this.pageNumber}`
-    );
-
     // now get the products for the given category id
     this.productService
       .getProductListPaginate(
@@ -106,7 +100,6 @@ export class ProductListComponent implements OnInit {
 
   processResult() {
     return (data: any) => {
-      console.log(data);
       this.products = data._embedded.products;
       this.pageNumber = data.page.number + 1;
       this.pageSize = data.page.size;
@@ -122,8 +115,6 @@ export class ProductListComponent implements OnInit {
   }
 
   addToCart(product: Product) {
-    console.log(`${product.name}, ${product.unitPrice}`);
-
     const cartItem = new CartItem(product);
 
     this.cartService.addToCart(cartItem);

@@ -9,12 +9,16 @@ import { Router } from '@angular/router';
 import { Country } from 'src/app/common/country';
 import { Order } from 'src/app/common/order';
 import { OrderItem } from 'src/app/common/order-item';
+import { PaymentInfo } from 'src/app/common/payment-info';
 import { Purchase } from 'src/app/common/purchase';
 import { State } from 'src/app/common/state';
 import { CartService } from 'src/app/services/cart.service';
 import { CheckoutService } from 'src/app/services/checkout.service';
 import { Luv2shopFormService } from 'src/app/services/luv2shop-form.service';
 import { CheckoutValidators } from 'src/app/validators/check-out-validators';
+import { environment } from 'src/environments/environment';
+
+// stripe-api-impl-frontend-commit
 
 @Component({
   selector: 'app-checkout',
@@ -36,6 +40,15 @@ export class CheckoutComponent implements OnInit {
 
   storage: Storage = sessionStorage;
 
+  // init Stripe API
+  stripe = Stripe(environment.stripePublishableKey);
+
+  paymentInfo: PaymentInfo = new PaymentInfo();
+  cardElement: any;
+  displayError: any = '';
+
+  isDisabled: boolean = false;
+
   constructor(
     private formBuilder: FormBuilder,
     private luv2shopFormService: Luv2shopFormService,
@@ -45,6 +58,9 @@ export class CheckoutComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    // setup Stripe payment form
+    this.setupStripePaymentForm();
+
     this.reviewCardDetails();
 
     // read the user's email address from browser storage
@@ -105,49 +121,39 @@ export class CheckoutComponent implements OnInit {
           CheckoutValidators.notOnlyWhitespace,
         ]),
       }),
-      creditCardDetails: this.formBuilder.group({
-        cardType: new FormControl('', [Validators.required]),
-        nameOnCard: new FormControl('', [
-          Validators.required,
-          Validators.minLength(5),
-          CheckoutValidators.notOnlyWhitespace,
-        ]),
-        cardNumber: new FormControl('', [
-          Validators.required,
-          Validators.pattern('[0-9]{16}'),
-        ]),
-        securityCode: new FormControl('', [
-          Validators.required,
-          Validators.pattern('[0-9]{3}'),
-        ]),
-        expirationMonth: [''],
-        expirationYear: [''],
-      }),
-    });
-
-    // populate CC exp months
-    const startMonth: number = new Date().getMonth() + 1;
-    console.log(`startMonth: ${startMonth}`);
-
-    this.luv2shopFormService
-      .getCreditCardMonths(startMonth)
-      .subscribe((data) => {
-        console.log(`Retrieved CC months: ${JSON.stringify(data)}`);
-        this.creditCardMonths = data;
-      });
-
-    // populate CC exp years
-    this.luv2shopFormService.getCreditCardYears().subscribe((data) => {
-      console.log(`Retrieved CC years: ${JSON.stringify(data)}`);
-      this.creditCardYears = data;
+      creditCardDetails: this.formBuilder.group({}),
     });
 
     // populate countries
     this.luv2shopFormService.getCountries().subscribe((data) => {
-      console.log(`Retrieved countries: ${JSON.stringify(data)}`);
       this.countries = data;
     });
   }
+
+  setupStripePaymentForm() {
+    // get a handle to stripe payments
+    var elements = this.stripe.elements();
+
+    // create a custom card element (hide zip-code field)
+    this.cardElement = elements.create('card', { hidePostalCode: true });
+
+    // add an instance of card UI component into the 'card-element' div
+    this.cardElement.mount('#card-element');
+
+    // add event binding for the 'change' event on the card element
+    this.cardElement.on('change', (event) => {
+      // get a handle to card-errors element
+      this.displayError = document.getElementById('card-errors');
+
+      if (event.complete) {
+        this.displayError.textContent = '';
+      } else if (event.error) {
+        // show validation error
+        this.displayError.textContent = event.error.message;
+      }
+    });
+  }
+
   reviewCardDetails() {
     // subscribe to cartService.totalQuantity
     this.cartService.totalQuantity.subscribe(
@@ -238,39 +244,11 @@ export class CheckoutComponent implements OnInit {
     }
   }
 
-  handleMonthsAndYears() {
-    const creditCardFormGroup = this.checkoutFormGroup.get('creditCardDetails');
-
-    const currentYear: number = new Date().getFullYear();
-    const selectedYear: number = Number(
-      creditCardFormGroup.value.expirationYear
-    );
-
-    // if the current year === selected year => start with the current month
-    let startMonth: number;
-
-    if (currentYear === selectedYear) {
-      startMonth = new Date().getMonth() + 1;
-    } else {
-      startMonth = 1;
-    }
-
-    this.luv2shopFormService
-      .getCreditCardMonths(startMonth)
-      .subscribe((data) => {
-        console.log(`Retrieved credit card months: ${JSON.stringify(data)}`);
-        this.creditCardMonths = data;
-      });
-  }
-
   getStates(formGroupName: string) {
     const formGroup = this.checkoutFormGroup.get(formGroupName);
 
     const countryCode = formGroup.value.country.code;
     const countryName = formGroup.value.country.name;
-
-    console.log(`${formGroupName} country code: ${countryCode}`);
-    console.log(`${formGroupName} country code: ${countryName}`);
 
     this.luv2shopFormService.getStates(countryCode).subscribe((data) => {
       formGroupName === 'shippingAddress'
@@ -339,20 +317,74 @@ export class CheckoutComponent implements OnInit {
     purchase.order = order;
     purchase.orderItems = orderItems;
 
-    // call REST API using CheckoutService
-    this.checkoutService.placeOrder(purchase).subscribe({
-      next: (res) => {
-        alert(
-          `Your order has been received.\nOrder tracking number: ${res.orderTrackingNumber}`
-        );
+    // compute payment info
+    this.paymentInfo.amount = Math.round(this.totalPrice * 100);
+    this.paymentInfo.currency = 'USD';
+    this.paymentInfo.receiptEmail = purchase.customer.email;
 
-        // clear cart
-        this.clearCart();
-      },
-      error: (err) => {
-        alert(`An error occurred: ${err.message}`);
-      },
-    });
+    // if valid form then
+    // - create payment intent
+    // - confirm card payment
+    // - place order
+
+    if (
+      !this.checkoutFormGroup.invalid &&
+      this.displayError.textContent === ''
+    ) {
+      this.isDisabled = true;
+      this.checkoutService
+        .createPaymentIntent(this.paymentInfo)
+        .subscribe((res) => {
+          this.stripe
+            .confirmCardPayment(
+              res.client_secret,
+              {
+                payment_method: {
+                  card: this.cardElement,
+                  billing_details: {
+                    email: purchase.customer.email,
+                    name: `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+                    address: {
+                      line1: purchase.billingAddress.street,
+                      city: purchase.billingAddress.city,
+                      state: purchase.billingAddress.state,
+                      postal_code: purchase.billingAddress.zipCode,
+                      country: this.billingAddressCountry.value.code,
+                    },
+                  },
+                },
+              },
+              { handleActions: false }
+            )
+            .then((result: any) => {
+              if (result.error) {
+                // show error
+                alert(`An error occurred: ${result.error.message}`);
+                this.isDisabled = false;
+              } else {
+                // call REST API via the CheckoutService
+                this.checkoutService.placeOrder(purchase).subscribe({
+                  next: (res) => {
+                    alert(
+                      `Your order has been received.\nOrder tracking number: ${res.orderTrackingNumber}`
+                    );
+
+                    // clear cart
+                    this.clearCart();
+                    this.isDisabled = false;
+                  },
+                  error: (err) => {
+                    alert(`An error occurred: ${err.message}`);
+                    this.isDisabled = false;
+                  },
+                });
+              }
+            });
+        });
+    } else {
+      this.checkoutFormGroup.markAllAsTouched();
+      return;
+    }
   }
 
   clearCart() {
@@ -360,6 +392,7 @@ export class CheckoutComponent implements OnInit {
     this.cartService.cartItems = [];
     this.cartService.totalPrice.next(0);
     this.cartService.totalQuantity.next(0);
+    this.cartService.persistCartItems();
 
     // clear the form
     this.checkoutFormGroup.reset();

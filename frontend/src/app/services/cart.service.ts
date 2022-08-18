@@ -15,7 +15,6 @@ export class CartService {
   constructor() {
     // read data from storage
     let data = JSON.parse(this.storage.getItem('cartItems'));
-    console.log(`My data : ${data}`);
 
     if (data != null) {
       this.cartItems = data;
@@ -36,9 +35,6 @@ export class CartService {
     // publish the new values ... all subscribers will receive the new data
     this.totalPrice.next(totalPriceValue);
     this.totalQuantity.next(totalQuantityValue);
-
-    // log cart data just for debugging purposes
-    this.logCartData(totalPriceValue, totalQuantityValue);
 
     // persist cart data
     this.persistCartItems();
@@ -112,25 +108,5 @@ export class CartService {
     // publish the new values... all subscribers will receive the new data
     this.totalPrice.next(totalPriceValue);
     this.totalQuantity.next(totalQuantityValue);
-
-    this.logCartData(totalPriceValue, totalQuantityValue);
-  }
-
-  logCartData(totalPriceValue: number, totalQuantityValue: number) {
-    console.log('Contents of the cart: ');
-
-    for (const item of this.cartItems) {
-      const subTotalPrice = item.quantity * item.unitPrice;
-      console.log(
-        `name=${item.name}, quantity=${item.quantity}, unitPrice=${item.unitPrice}, subTotalPrice=${subTotalPrice}`
-      );
-    }
-
-    console.log(
-      `totalPrice=${totalPriceValue.toFixed(
-        2
-      )}, totalQuanity=${totalQuantityValue}`
-    );
-    console.log('---------');
   }
 }
