@@ -1,5 +1,5 @@
 # eCommerce-spring-angular
-_A fully fledged Spring Boot application showcasing the basic CRUD operations._ <br>
+_The application is an example of a full stack single page e-commerce application. It includes such features as displaying the seller's items, accepting and processing orders, providing customer tracking numbers and receipts, payment systems and more._ <br>
 
 ### What's inside
 * Maven
