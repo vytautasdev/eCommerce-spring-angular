@@ -3,5 +3,5 @@ _The application is an example of a full stack single page e-commerce applicatio
 
 ## Video Demonstrations of Application
 
-https://user-images.githubusercontent.com/86210052/193114942-20e622bd-f937-45e1-aa65-f4bfc479533d.mp4
+
 
